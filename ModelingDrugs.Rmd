@@ -9,14 +9,114 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+## Pre-processing
 
 ```{r cars}
-summary(cars)
+library(readr)
+library(pdp)
+library(vip)
+library(rpart.plot)
+library(rpart)
+library(caret)
+library(tidyverse)
+library(janitor)
+
+sel_data<-health_data |>
+  rename(
+    Drug_Overdose_Deaths = drug_overdose_deaths_raw_value,
+    Alcohol_Impaired_Driving_Deaths = alcohol_impaired_driving_deaths_raw_value,
+    Unemployment_Rate = unemployment_raw_value,
+    Income_Inequality = income_inequality_raw_value,
+    Highschool_Comp_Rate = high_school_completion_raw_value,
+    Adult_Smoking_Rate = adult_smoking_raw_value,
+    Excessive_Drinking_Rate = excessive_drinking_raw_value,
+    Median_House_Income = median_household_income_raw_value,
+    College_Education_Rate = some_college_raw_value,
+    Children_In_Poverty = children_in_poverty_raw_value,
+    Single_Parent_House = children_in_single_parent_households_raw_value,
+    Social_Associations = social_associations_raw_value,
+    Pop_Under_18 = x_below_18_years_of_age_raw_value,
+    Pop_Over_65 = x_65_and_older_raw_value,
+    NH_Black = x_non_hispanic_black_raw_value,
+    American_Or_Alaska_Native = x_american_indian_or_alaska_native_raw_value,
+    Asian_Pop = x_asian_raw_value,
+    Pacific_Islander = x_native_hawaiian_or_other_pacific_islander_raw_value,
+    Hispanic_Pop = x_hispanic_raw_value,
+    NH_White = x_non_hispanic_white_raw_value,
+    English_Profic = x_not_proficient_in_english_raw_value,
+    Female_Pop = x_female_raw_value,
+    Rural_Pop = x_rural_raw_value
+  ) 
+
+selected_data <- sel_data|> 
+  select(
+    name, state_abbreviation, x5_digit_fips_code, x5_digit_fips_code, Drug_Overdose_Deaths, Alcohol_Impaired_Driving_Deaths,
+    Unemployment_Rate, Income_Inequality, Highschool_Comp_Rate, 
+    Adult_Smoking_Rate, Excessive_Drinking_Rate, Median_House_Income,
+    College_Education_Rate, Children_In_Poverty, Single_Parent_House,
+    Social_Associations, Pop_Under_18, 
+    Pop_Over_65, NH_Black, 
+    American_Or_Alaska_Native, Hispanic_Pop, 
+    Female_Pop, Rural_Pop, population_raw_value
+  ) |>
+  mutate(x5_digit_fips_code=ifelse(nchar(x5_digit_fips_code) == 4, paste0("0", x5_digit_fips_code), x5_digit_fips_code)) |>
+  mutate(across(c(Drug_Overdose_Deaths, Alcohol_Impaired_Driving_Deaths,
+    Unemployment_Rate, Income_Inequality, Highschool_Comp_Rate, 
+    Adult_Smoking_Rate, Excessive_Drinking_Rate, Median_House_Income,
+    College_Education_Rate, Children_In_Poverty, Single_Parent_House,
+    Social_Associations, Pop_Under_18, 
+    Pop_Over_65, NH_Black, 
+    American_Or_Alaska_Native, Hispanic_Pop, 
+    Female_Pop, Rural_Pop, population_raw_value), 
+    as.numeric
+  ))
+
+library(tigris)
+#us_counties df is strictly 5 numbers while selected_data has 4 digits for nums less than 10000
+
+us_counties <- counties(cb = TRUE) # US COUNTIES, census_df have CA but selected_data doesn't have it (06037)
+census_df <- us_counties |> # issue with census df not having ca counties
+  select(x5_digit_fips_code=GEOID, land_area=ALAND)
+
+# Inner join: only rows with matching x5_digit_fips_code will be included
+new_sel <- merge(selected_data, census_df, by = "x5_digit_fips_code") |>
+  mutate(land_area_km = land_area / 1000000) |>
+  mutate(pop_den = population_raw_value / land_area_km) |>
+  mutate(urban_pop=1-Rural_Pop)
+  
+
+quantiles <- quantile(new_sel$urban_pop, probs = c(0, 0.33, 0.66, 1))
+
+# Display the quantiles
+print(quantiles)
+
+new_df <- new_sel |>
+  mutate(urban_level = ifelse(urban_pop==0, "rural", ifelse(urban_pop<0.52, "suburban", "urban"))) |>
+  mutate(Urban_yes=ifelse(urban_pop>0.33, "urban", "rural")) # urban with just 2 levels
+
+# high school--completed at least high school diploma
+# some college--completed high school and pursued education after (not necessarily have to complete it)
+# union--% that did not complete (1-high school)
+
+# % of people under 18 in poverty (synonymous with income inequality)
+library(caret)
+
+# necessary to encode variables?
+
+dummyVars(~income_ine)
+new_drugsdf <- new_df |>
+  # mutate(income_ineq_level=ifelse(Income_Inequality<0.123, "low", "high")) |>
+  mutate(urban_num=as.numeric(factor(urban_level, levels = c("rural", "suburban", "urban")))) |>
+  mutate(urban_num_twolev = as.numeric(factor(Urban_yes, levels = c("urban", "rural")))) |>
+  select(-Alcohol_Impaired_Driving_Deaths, -Excessive_Drinking_Rate, 
+         -geometry, -land_area_km, -population_raw_value, 
+         -Rural_Pop, -land_area, -Highschool_Comp_Rate,
+         -Pop_Under_18, -Pop_Over_65, -Children_In_Poverty) |>
+  mutate(across(c(Unemployment_Rate, Income_Inequality, Adult_Smoking_Rate, Median_House_Income, College_Education_Rate,
+                  Social_Associations, NH_Black, urban_pop, urban_num, urban_num_twolev, American_Or_Alaska_Native, Hispanic_Pop, Female_Pop), scale)) |>
+  drop_na(Drug_Overdose_Deaths)
+
+
 ```
 
 ## Including Plots
@@ -27,4 +127,4 @@ You can also embed plots, for example:
 plot(pressure)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
