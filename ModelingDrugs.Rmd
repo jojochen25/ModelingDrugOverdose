@@ -54,7 +54,7 @@ sel_data<-health_data |>
     Rural_Pop = x_rural_raw_value
   ) 
 
-selected_data <- sel_data|> 
+selected_data <- sel_data|> # non-scaled
   select(
     name, state_abbreviation, x5_digit_fips_code, x5_digit_fips_code, Drug_Overdose_Deaths, Alcohol_Impaired_Driving_Deaths,
     Unemployment_Rate, Income_Inequality, Highschool_Comp_Rate, 
@@ -95,16 +95,19 @@ selected_data <-selected_data |>
 
 
 library(tigris)
-#us_counties df is strictly 5 numbers while selected_data has 4 digits for nums less than 10000
+# us_counties df is strictly 5 numbers while selected_data has 4 digits for nums less than 10000
 
-us_counties <- counties(cb = TRUE) # US COUNTIES, census_df have CA but selected_data doesn't have it (06037)
-census_df <- us_counties |> 
-  select(x5_digit_fips_code=GEOID, land_area=ALAND)
+# us_counties <- counties(cb = TRUE, year=2022) # US COUNTIES, census_df have CA but selected_data doesn't have it (06037)
+# census_df <- us_counties |>
+#   select(x5_digit_fips_code=GEOID, land_area=ALAND)
 
 # create population density variable
-new_sel <- merge(selected_data, census_df, by = "x5_digit_fips_code") |>
-  mutate(land_area_km = land_area / 1000000) |>
-  mutate(pop_den = population_raw_value / land_area_km) |>
+# new_sel <- merge(selected_data, census_df, by = "x5_digit_fips_code") |>
+#   mutate(land_area_km = land_area / 1000000) |>
+#   mutate(pop_den = population_raw_value / land_area_km) |>
+#   mutate(urban_pop=1-Rural_Pop)
+
+new_sel<-selected_data |>
   mutate(urban_pop=1-Rural_Pop)
   
 
@@ -134,11 +137,11 @@ library(caret)
 
 new_drugsdf <- new_df |>
   # mutate(income_ineq_level=ifelse(Income_Inequality<0.123, "low", "high")) |>
-  mutate(urban_num=as.numeric(factor(urban_level, levels = c("rural", "suburban", "urban")))) |>
+  mutate(urban_num=as.numeric(factor(urban_level, levels = c("rural", "suburban", "urban")))) |> 
   mutate(urban_num_twolev = as.numeric(factor(Urban_yes, levels = c("urban", "rural")))) |>
   select(x5_digit_fips_code, name, state_abbreviation, Drug_Overdose_Deaths, Unemployment_Rate, Income_Inequality, suicides, mental_ratio, Adult_Smoking_Rate, Median_House_Income, Highschool_Comp_Rate, Single_Parent_House, Social_Associations,
-         NH_Black, American_Or_Alaska_Native, Hispanic_Pop, Female_Pop, region, pop_den, urban_pop, urban_level,
-         Urban_yes, urban_num, urban_num_twolev) |>
+         NH_Black, American_Or_Alaska_Native, Hispanic_Pop, Female_Pop, region, urban_pop, urban_level,
+         Urban_yes, urban_num, urban_num_twolev) |> # removed pop_den
   # select(-Alcohol_Impaired_Driving_Deaths, -Excessive_Drinking_Rate, 
   #        -geometry, -land_area_km, -population_raw_value, 
   #        -Rural_Pop, -land_area, -Highschool_Comp_Rate,
@@ -209,6 +212,9 @@ log_random_state <-lmer(log(Drug_Overdose_Deaths)~Unemployment_Rate + Income_Ine
 plot(fitted(log_random_state), residuals(log_random_state))
 # AIC(log_fixed_no_urban, log_fixed_urban, log_random_urban, log_random_state)
 
+# log_random_s <-lmer(log(Drug_Overdose_Deaths)~Unemployment_Rate + Income_Inequality + Median_House_Income + Adult_Smoking_Rate + Highschool_Comp_Rate + Social_Associations + Female_Pop + mental_ratio+ suicides +(1|state_abbreviation), data=selected_data)
+
+
 ```
 
 ## Plot (fixed) coefficient estimates 
@@ -255,14 +261,52 @@ ggplot(coef_df, aes(x = Estimate, y = reorder(Predictor, Estimate), xmin = ConfL
   
 
 abline(v = 0, col = "black", lwd = 2, lty = 2)
+log_random_state
 ```
 
 High suicide rate, % female, smoking rate, urbanization, income inequality is associated with high drug overdose. Low median income and low social associations is associated with low drug overdose.
+urban has the most num of observations  in urban_num_two_lev
 
 maybe use drug_overdose_deaths for each race 
 Drug_Overdose_Deaths_asian=drug_overdose_deaths_aian,
     Drug_Overdose_Deaths_pacific=drug_overdose_deaths_asian_pacific_islander,
     Drug_Overdose_Deaths_black=drug_overdose_deaths_black
+    
+    
+## Plot correlation matrix
+
+```{r}
+new_drugsdf_num <- new_drugsdf |>
+  dplyr::select(!c(urban_num_twolev, region, state_abbreviation, urban_level, urban_num))
+
+corr_mat<-cor(new_drugsdf_num)
+# Plot the heat map
+library(ggcorrplot)
+ggcorrplot(corr_mat, method = "circle", type = "full", 
+           lab = TRUE, lab_size = 3, 
+           title = "Correlation Heat Map", 
+           colors = c("blue", "white", "red"))
+
+# library(ggplot2)
+# ggplot(data=corr_mat, aes())
+
+```
+    
+## Differences between rural and urban counties
+
+```{r}
+# two df--urban and rural counties
+drugs_urban=new_drugsdf |>
+  filter(urban_num_twolev==1)
+
+drugs_rural=new_drugsdf |>
+  filter(urban_num_twolev==2)
+
+log_random_state_urban <-lmer(log(Drug_Overdose_Deaths)~Unemployment_Rate + Income_Inequality + Median_House_Income + Adult_Smoking_Rate + Highschool_Comp_Rate + Social_Associations + Female_Pop + mental_ratio+ suicides +(1|state_abbreviation), data=drugs_urban)
+log_state_urban <-lm(log(Drug_Overdose_Deaths)~Unemployment_Rate + Income_Inequality + Median_House_Income + Adult_Smoking_Rate + Highschool_Comp_Rate + Social_Associations + Female_Pop + mental_ratio+ suicides, data=drugs_urban)
+
+anova(log_random_state_urban, log_state_urban )
+```
     
 ## Plot (random) coefficient estimates 
 
@@ -306,13 +350,13 @@ There is clear baseline variability in drug overdose deaths across states. Most 
 ## Map of (random) coefficient estimates 
 
 ```{r}
-filtered_tidy <- tidy_model %>%
-  filter((conf.low > 0 & conf.high > 0) | (conf.low < 0 & conf.high < 0))
-
+# filtered_tidy <- tidy_model %>%
+#   filter((conf.low > 0 & conf.high > 0) | (conf.low < 0 & conf.high < 0))
+library(dplyr)
 filtered_tidy_high <- tidy_model %>%
   filter((conf.low > 0 & conf.high > 0)) |>
   arrange(desc(level)) |>
-  select(level, estimate) # states that have baseline high intercepts in desc order
+  dplyr::select(level, estimate) # states that have baseline high intercepts in desc order
 
 ```
 
@@ -357,4 +401,6 @@ ggplot(data = us_map, aes(x = long, y = lat, group = group, fill = estimate)) +
 
 ```
 
-States in midwest and east coast has highest baseline drug overdose deaths. Thus, we should focus drug overdose prevention efforts on these states.  
+States in midwest and east coast (region 3 and 4) have highest baseline drug overdoses--deaths not attributed to the predictors in the model. Thus, we should prioritize drug overdose prevention efforts on these states.  
+
+plot drug overdoses across west virginia 
