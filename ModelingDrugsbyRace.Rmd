@@ -1,0 +1,99 @@
+---
+title: "ModelingDrugsbyRace"
+author: "Jodie"
+date: "2024-08-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+library(readr)
+library(pdp)
+library(vip)
+library(rpart.plot)
+library(rpart)
+library(caret)
+library(tidyverse)
+library(janitor)
+
+# if there is an error, load data_org into your workspace by clicking on data_org copy.RData
+
+sel_data<-health_data |>
+  slice(-1) |>
+  rename(
+    Drug_Overdose_Deaths = drug_overdose_deaths_raw_value,
+    Drug_Overdose_Deaths_aian=drug_overdose_deaths_aian, 
+    Drug_Overdose_Deaths_black = drug_overdose_deaths_black,
+    Drug_Overdose_Deaths_hispanic=drug_overdose_deaths_hispanic,
+    Drug_Overdose_Deaths_nhopi = drug_overdose_deaths_nhopi,
+    Drug_Overdose_Deaths_white=drug_overdose_deaths_white,
+    mental_ratio = ratio_of_population_to_mental_health_providers,
+    #uninsured=uninsured_raw_value,
+    suicides = suicides_raw_value,
+    Alcohol_Impaired_Driving_Deaths = alcohol_impaired_driving_deaths_raw_value,
+    Unemployment_Rate = unemployment_raw_value,
+    Income_Inequality = income_inequality_raw_value,
+    College_Comp_Rate = some_college_raw_value,
+    Adult_Smoking_Rate = adult_smoking_raw_value,
+    Excessive_Drinking_Rate = excessive_drinking_raw_value,
+    Median_House_Income = median_household_income_raw_value,
+    Highschool_Comp_Rate = some_college_raw_value,
+    Children_In_Poverty = children_in_poverty_raw_value,
+    Single_Parent_House = children_in_single_parent_households_raw_value,
+    Social_Associations = social_associations_raw_value,
+    Pop_Under_18 = x_below_18_years_of_age_raw_value,
+    Pop_Over_65 = x_65_and_older_raw_value,
+    NH_Black = x_non_hispanic_black_raw_value,
+    American_Or_Alaska_Native = x_american_indian_or_alaska_native_raw_value,
+    Asian_Pop = x_asian_raw_value,
+    Pacific_Islander = x_native_hawaiian_or_other_pacific_islander_raw_value,
+    Hispanic_Pop = x_hispanic_raw_value,
+    NH_White = x_non_hispanic_white_raw_value,
+    English_Profic = x_not_proficient_in_english_raw_value,
+    Female_Pop = x_female_raw_value,
+    Rural_Pop = x_rural_raw_value
+  ) 
+
+selected_data <- sel_data|> 
+  select(
+    name, state_abbreviation, x5_digit_fips_code, x5_digit_fips_code, Drug_Overdose_Deaths, Alcohol_Impaired_Driving_Deaths,
+    Unemployment_Rate, Income_Inequality, Highschool_Comp_Rate, 
+    Adult_Smoking_Rate, Excessive_Drinking_Rate, Median_House_Income,
+    Highschool_Comp_Rate, Children_In_Poverty, Single_Parent_House,
+    Social_Associations, Pop_Under_18, 
+    Pop_Over_65, NH_Black, 
+    American_Or_Alaska_Native, Hispanic_Pop, 
+    Female_Pop, Rural_Pop, population_raw_value, mental_ratio, suicides, #uninsured
+  ) |>
+  select(starts_with("drug_overdose"))
+  mutate(x5_digit_fips_code=ifelse(nchar(x5_digit_fips_code) == 4, paste0("0", x5_digit_fips_code), x5_digit_fips_code)) |>
+  mutate(across(c(Drug_Overdose_Deaths, Alcohol_Impaired_Driving_Deaths,
+    Unemployment_Rate, Income_Inequality, Highschool_Comp_Rate, 
+    Adult_Smoking_Rate, Excessive_Drinking_Rate, Median_House_Income,
+    Highschool_Comp_Rate, Children_In_Poverty, Single_Parent_House,
+    Social_Associations, Pop_Under_18, 
+    Pop_Over_65, NH_Black, 
+    American_Or_Alaska_Native, Hispanic_Pop, 
+    Female_Pop, Rural_Pop, population_raw_value, mental_ratio, suicides), 
+    as.numeric
+  ))
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
