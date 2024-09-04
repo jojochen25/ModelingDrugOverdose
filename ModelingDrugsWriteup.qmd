@@ -2,7 +2,6 @@
 title: "Mixed Effects Regression Analysis on Drug Overdose"
 author: 
 - Jodie Chen
-date: "Sep 4, 2024"
 toc: true
 format:
   html:
