@@ -1,4 +1,7 @@
 ---
+title: "Mixed Effects Regression Analysis on Drug Overdose"
+author: 
+- Jodie Chen
 date: "Sep 4, 2024"
 toc: true
 format:
@@ -226,11 +229,11 @@ plot(fitted(log_random_state), residuals(log_random_state))
 
 ## Social and demographic predictors that affect drug overdoses
 
-Looking at the fixed effects plot below, it is evident that high county-level income inequality ratios and population of women is associated with high drug overdose deaths. Fatal drug overdoses are more common among areas with more economic distress which explains why a greater income inequality ratio is attributed to higher drug overdoses: if the income inequality ratio increases by 1, drug overdoses increase by 1.12 deaths per 100,000 (assuming the average drug overdose is 25 deaths/100,000) which is a 4.5% increase.
+Looking at the fixed effects plot below, it is evident that high county-level **income inequality ratios** is associated with high drug overdose deaths. Fatal drug overdoses are more common among areas with more economic distress which explains why a greater income inequality ratio is attributed to higher drug overdoses: if the income inequality ratio increases by 1, drug overdoses increase by 1.12 deaths per 100,000 (assuming the average drug overdose is 25 deaths/100,000) which is a 4.5% increase.
 
-% female, surprisingly, is also associated with drug overdose. While males historically have had higher rates of drug overdose deaths than females, the model shows since 2019, counties with higher female populations have higher drug overdose rates. If a county’s female population increases by 1%, drug overdoses (per 100,000) is expected to increase by 2.4% or about 1 death /166,000. This jump might be explained by a 3-fold increase in overdose mortality from 2018-2021 for pregnant and postpartum women in 2018-2021. Dr. Nora Volkow, director of the National Institute on Drug Abuse, attributed this to the fact that drug use is even more stigmatized for pregnant women, making them less likely to seek or receive help for dependence on opioids and other drugs. Furthermore, pregnant and postpartum women face punitive policies for drug abuse including loss of custody of their children and incarceration. 60% of drug overdose deaths among pregnant women occurred outside healthcare settings, often in counties with sufficient healthcare resources like emergency and obstetric care, which proves that medical services are present but are not being accessed. Such stigmatization and punitive measures discourage women from seeking help. 
+**% female**, surprisingly, is also associated with drug overdose. While males historically have had higher rates of drug overdose deaths than females, the model shows since 2019, counties with higher female populations have higher drug overdose rates. If a county’s female population increases by 1%, drug overdoses (per 100,000) is expected to increase by 2.4% or about 1 death /166,000. This jump might be explained by a 3-fold increase in overdose mortality from 2018-2021 for pregnant and postpartum women in 2018-2021. Dr. Nora Volkow, director of the National Institute on Drug Abuse, attributed this to the fact that drug use is even more stigmatized for pregnant women, making them less likely to seek or receive help for dependence on opioids and other drugs. Furthermore, pregnant and postpartum women face punitive policies for drug abuse including loss of custody of their children and incarceration. 60% of drug overdose deaths among pregnant women occurred outside healthcare settings, often in counties with sufficient healthcare resources like emergency and obstetric care, which proves that medical services are present but are not being accessed. Such stigmatization and punitive measures discourage women from seeking help. 
 
-Suicide rate has a weaker association compared to the other two–increasing suicide rate by 1 per 100,000 results in 1.81% increase in drug overdoses or 1 death per 200,000.stronger correlation with drug overdoses–increasing suicide rate by 1 per 100,000 results in 46% increase in drug overdoses or 12 deaths/100,000. 
+Suicide rate has a weaker association compared to the other two–increasing suicide rate by 1 per 100,000 results in 1.81% increase in drug overdoses or 1 death per 200,000.
 
 
 ```{r, include=FALSE}
@@ -278,7 +281,7 @@ ggplot(coef_df, aes(x = Estimate, y = reorder(Predictor, Estimate), xmin = ConfL
 #abline(v = 0, col = "black", lwd = 2, lty = 2)
 ```
 
-Each $10,000 increase in median house income is associated with a drug overdose decrease by 3.045% or decrease in 1 death per 115000. This is in line with previous studies that found a link between low socioeconomic status and long-term opioid use for management of chronic pain and conversely, people with higher education level and income are more likely to accept costlier, non-pharmacological treatments like physical therapy. This makes sense as low-income communities have higher concentrations of economic stressors like poverty, low educational attainment, and unemployment which could be related to higher drug overdose rates as residents are more likely to misuse drugs to manage stress caused by economic distress. 
+Each $10,000 increase in **median house income** is associated with a drug overdose decrease by 3.045% or decrease in 1 death per 115,000. This is in line with previous studies that found a link between low socioeconomic status and long-term opioid use for management of chronic pain and conversely, people with higher education level and income are more likely to accept costlier, non-pharmacological treatments like physical therapy. This makes sense as low-income communities have higher concentrations of economic stressors like poverty, low educational attainment, and unemployment which could be related to higher drug overdose rates as residents are more likely to misuse drugs to manage stress caused by economic distress. 
 
 Membership organization have less of an effect–increasing membership organizations (i.e. bowling centers, golf clubs, fitness centers, religious organizations) per 100,000 decreases drug overdoses by 1.64% or 1 death per 200,000. Number of membership associations can be a metric for social support networks, indicating that counties with more opportunities for community building could decrease drug overdoses. 
 
@@ -328,7 +331,7 @@ tidy_model$level <- fct_reorder(tidy_model$level, tidy_model$estimate)
 
 ## Other factors that affect state-level variability
 
-Ignoring the effect of predictors on drug overdose, we consider the baseline drug overdoses for each state indicated by the random intercepts to see if there are external factors contributing to drug overdose rates. West Virginia has by far the highest drug overdose rate which aligns with the state statistic in having the highest opioid prescription rate in the United States. This is largely attributed to the high number of heavy manual labor professions like mining and timbering which often cause injuries to workers. Delaware’s high drug overdose rate is also primarily related to the opioid crisis and high opioid prescription rate—opioid overdose accounted for 88% of the state’s drug overdose deaths in 2021. In Delaware and its surrounding states, new drugs and combinations are frequently used in conjunction with opioids, making traditional treatment options not as effective. For example, 90% of opioid street samples were found to contain xylazine which does not respond to the opioid overdose reversal drug naloxone. More immediate solutions are needed to combat the constantly evolving usage of opioid adulterants.
+Ignoring the effect of predictors on drug overdose, we consider the baseline drug overdoses for each state indicated by the random intercepts to see if there are external factors contributing to drug overdose rates. West Virginia has by far the highest drug overdose rate which aligns with the state statistic in having the highest opioid prescription rate in the United States. This is largely attributed to the high number of heavy manual labor professions like mining and timbering which often cause injuries to workers. Delaware’s high drug overdose rate is also primarily related to the opioid crisis and high opioid prescription rate—opioid overdose accounted for 88% of the state’s drug overdose deaths in 2021. In Delaware and its surrounding states, new drugs and combinations are frequently used in conjunction with opioids, making traditional treatment options not as effective. For example, 90% of opioid street samples were found to contain xylazine which does not respond to the opioid overdose reversal drug naloxone. More immediate solutions are needed to combat the constantly evolving usage of **opioid adulterants**.
 
 
 ```{r, echo=FALSE}
@@ -438,6 +441,18 @@ Additionally, while education (measured by high school completion rate) and adul
 
 It is possible that the effect of predictors on drug overdose might vary by state (or another group), so a potential next step is to include random slopes. Additionally, the correlation of these predictors might vary by demographic. Since we have data on drug overdoses for different ethnic groups, we could make regression models for each and identify the most correlated predictors for each group to design demographic-tailored interventions. 
 
+# References
+
+Centers for Disease Control and Prevention. (n.d.). Opioid prescribing rates in US vary widely between states. Retrieved from https://www.kff.org/statedata/mental-health-and-substance-use-state-fact-sheets/delaware/#:~
+=While%20white%20people%20continue%20to,54%20per%20100%2C000%20in%202021
+
+Drug Enforcement Administration. (2017). West Virginia drug situation report (DEA-WAS-DIR-024-17). Retrieved from https://www.dea.gov/sites/default/files/2018-07/DEA-WAS-DIR-024-17%20West%20Virginia%20Drug%20Situation%20-UNCLASSIFIED.pdf
+
+Garnett, M. F., Curtin, S. C., & Stone, D. M. (2019). Higher median household income was associated with lower drug overdose death rates. Retrieved from https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6375680/
+
+Kaiser Family Foundation. (2021). Delaware: Mental health and substance use state fact sheets. Retrieved from https://udspace.udel.edu/bitstreams/0fc089f2-2025-41c6-99de-5aecf8aa2818/download
+
+National Institute on Drug Abuse. (2023). Overdose deaths increased in pregnant and postpartum women from early 2018 to late 2021. Retrieved from https://nida.nih.gov/news-events/news-releases/2023/11/overdose-deaths-increased-in-pregnant-and-postpartum-women-from-early-2018-to-late-2021
 
 
 
