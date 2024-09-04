@@ -1,5 +1,5 @@
 ---
-title: "Mixed Effects Regression Analysis on Drug Overdose"
+title: "Mixed Effects Regression Analysis on Drug Overdose Rates"
 author: 
 - Jodie Chen
 toc: true
