@@ -1,0 +1,394 @@
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Background
+
+The County Health Rankings and Roadmaps dataset contains county-level data on social and demographic variables. It is possible that counties within the same region (e.g. state) are correlated–overdose death rates could vary by state due to differences in locally-regulated healthcare systems, law enforcement involving drugs, drug accessibility (variables not examined in the analysis). For example, West Virginia has by far the highest drug overdose deaths with opioid accounting for 83% of all drug overdose deaths in 2021. This is higher than the state average opioid overdose deaths accounting for 75% of drug overdose deaths. Uncoincidentally, this is attributed to West Virginia having the highest opioid prescription rate. This baseline variability could also be attributed to regional differences (across the US and within state) in specific drug availability and use.
+
+# Methods
+
+Since counties could be correlated within different geographic region levels, I decided to test mixed effects model with a random intercept term for: 
+
+**1. Urbanization level (three levels)**-- CDC found that urban counties generally had higher drug overdoses due to higher population density and easier access to drugs from the greater number of distributors and markets in the cities. 
+
+**2. Public Health regions as defined by the U.S. Department of Health and Human Services**-- Counties in these regions may vary in drug overdoses as different public health initiatives are implemented based on the specific needs of the territories/states within each region. 
+
+**3. The 50 states**–-for reasons mentioned in Background. 
+
+
+
+```{r cars}
+library(readr)
+library(pdp)
+library(vip)
+library(rpart.plot)
+library(rpart)
+library(caret)
+library(tidyverse)
+library(janitor)
+
+# if there is an error, load data_org into your workspace by clicking on data_org copy.RData
+load("~/Downloads/CMU program/Modeling Drug Overdose/data_org copy.RData")
+
+sel_data<-health_data |>
+  slice(-1) |>
+  rename(
+    Drug_Overdose_Deaths = drug_overdose_deaths_raw_value,
+    mental_ratio = ratio_of_population_to_mental_health_providers,
+    #uninsured=uninsured_raw_value,
+    suicides = suicides_raw_value,
+    Alcohol_Impaired_Driving_Deaths = alcohol_impaired_driving_deaths_raw_value,
+    Unemployment_Rate = unemployment_raw_value,
+    Income_Inequality = income_inequality_raw_value,
+    College_Comp_Rate = some_college_raw_value,
+    Adult_Smoking_Rate = adult_smoking_raw_value,
+    Excessive_Drinking_Rate = excessive_drinking_raw_value,
+    Median_House_Income = median_household_income_raw_value,
+    Highschool_Comp_Rate = some_college_raw_value,
+    Children_In_Poverty = children_in_poverty_raw_value,
+    Single_Parent_House = children_in_single_parent_households_raw_value,
+    Social_Associations = social_associations_raw_value,
+    Pop_Under_18 = x_below_18_years_of_age_raw_value,
+    Pop_Over_65 = x_65_and_older_raw_value,
+    NH_Black = x_non_hispanic_black_raw_value,
+    American_Or_Alaska_Native = x_american_indian_or_alaska_native_raw_value,
+    Asian_Pop = x_asian_raw_value,
+    Pacific_Islander = x_native_hawaiian_or_other_pacific_islander_raw_value,
+    Hispanic_Pop = x_hispanic_raw_value,
+    NH_White = x_non_hispanic_white_raw_value,
+    English_Profic = x_not_proficient_in_english_raw_value,
+    Female_Pop = x_female_raw_value,
+    Rural_Pop = x_rural_raw_value
+  ) 
+
+selected_data <- sel_data|> # non-scaled
+  select(
+    name, state_abbreviation, x5_digit_fips_code, x5_digit_fips_code, Drug_Overdose_Deaths, Alcohol_Impaired_Driving_Deaths,
+    Unemployment_Rate, Income_Inequality, Highschool_Comp_Rate, 
+    Adult_Smoking_Rate, Excessive_Drinking_Rate, Median_House_Income,
+    Highschool_Comp_Rate, Children_In_Poverty, Single_Parent_House,
+    Social_Associations, Pop_Under_18, 
+    Pop_Over_65, NH_Black, 
+    American_Or_Alaska_Native, Hispanic_Pop, 
+    Female_Pop, Rural_Pop, population_raw_value, mental_ratio, suicides, #uninsured
+  ) |>
+  mutate(x5_digit_fips_code=ifelse(nchar(x5_digit_fips_code) == 4, paste0("0", x5_digit_fips_code), x5_digit_fips_code)) |>
+  mutate(across(c(Drug_Overdose_Deaths, Alcohol_Impaired_Driving_Deaths,
+    Unemployment_Rate, Income_Inequality, Highschool_Comp_Rate, 
+    Adult_Smoking_Rate, Excessive_Drinking_Rate, Median_House_Income,
+    Highschool_Comp_Rate, Children_In_Poverty, Single_Parent_House,
+    Social_Associations, Pop_Under_18, 
+    Pop_Over_65, NH_Black, 
+    American_Or_Alaska_Native, Hispanic_Pop, 
+    Female_Pop, Rural_Pop, population_raw_value, mental_ratio, suicides), 
+    as.numeric
+  ))
+
+# create a new variable that categorizes counties by HHS public health region 
+selected_data <-selected_data |>
+  mutate(region=case_when(
+    state_abbreviation %in% c("CT", "ME", "MA", "NH", "RI", "VT") ~ "Region 1",
+    state_abbreviation %in% c("NJ", "NY", "PR", "VI") ~ "Region 2",
+    state_abbreviation %in% c("DE", "DC", "MD", "PA", "VA", "WV") ~ "Region 3",
+    state_abbreviation %in% c("AL", "FL", "GA", "KY", "MS", "NC", "SC", "TN") ~ "Region 4",
+    state_abbreviation %in% c("IL", "IN", "MI", "MN", "OH", "WI") ~ "Region 5",
+    state_abbreviation %in% c("AR", "LA", "NM", "OK", "TX") ~ "Region 6",
+    state_abbreviation %in% c("IA", "KS", "MO", "NE") ~ "Region 7",
+    state_abbreviation %in% c("CO", "MT", "ND", "SD", "UT", "WY") ~ "Region 8",
+    state_abbreviation %in% c("AZ", "CA", "HI", "NV", "AS", "MP", "FM", "GU", "MH", "PW") ~ "Region 9",
+    state_abbreviation %in% c("AK", "ID", "OR", "WA") ~ "Region 10",
+    TRUE ~ "Unknown"
+  ))
+
+
+library(tigris)
+
+new_sel<-selected_data |>
+  mutate(urban_pop=1-Rural_Pop)
+  
+
+quantiles <- quantile(new_sel$urban_pop, probs = c(0, 0.33, 0.66, 1))
+
+# Display the quantiles
+print(quantiles)
+
+# create 2-level variable that represents if county is more rural or urban 
+# create 3-level variable that represents if county is rural, suburban, or rural
+new_df <- new_sel |>
+  mutate(urban_level = ifelse(urban_pop==0, "rural", ifelse(urban_pop<0.52, "suburban", "urban"))) |>
+  mutate(Urban_yes=ifelse(urban_pop>0.33, "urban", "rural")) # urban with just 2 levels
+
+
+library(caret)
+
+new_drugsdf <- new_df |>
+  # mutate(income_ineq_level=ifelse(Income_Inequality<0.123, "low", "high")) |>
+  mutate(urban_num=as.numeric(factor(urban_level, levels = c("rural", "suburban", "urban")))) |> 
+  mutate(urban_num_twolev = as.numeric(factor(Urban_yes, levels = c("urban", "rural")))) |>
+  select(x5_digit_fips_code, name, state_abbreviation, Drug_Overdose_Deaths, Unemployment_Rate, Income_Inequality, suicides, mental_ratio, Adult_Smoking_Rate, Median_House_Income, Highschool_Comp_Rate, Single_Parent_House, Social_Associations,
+         NH_Black, American_Or_Alaska_Native, Hispanic_Pop, Female_Pop, region, urban_pop, urban_level,
+         Urban_yes, urban_num, urban_num_twolev) |> # removed pop_den
+  # select(-Alcohol_Impaired_Driving_Deaths, -Excessive_Drinking_Rate, 
+  #        -geometry, -land_area_km, -population_raw_value, 
+  #        -Rural_Pop, -land_area, -Highschool_Comp_Rate,
+  #        -Pop_Under_18, -Pop_Over_65, -Children_In_Poverty, urban_level, region) |>
+  mutate(across(c(Unemployment_Rate, Income_Inequality, Adult_Smoking_Rate, Median_House_Income, Highschool_Comp_Rate,
+                  Social_Associations, NH_Black, American_Or_Alaska_Native, Hispanic_Pop, Female_Pop, suicides, mental_ratio), scale)) |>
+  drop_na(Drug_Overdose_Deaths) 
+
+new_drugsdf$urban_num_twolev<-as.factor(new_drugsdf$urban_num_twolev)
+new_drugsdf$urban_num<-as.factor(new_drugsdf$urban_num)
+
+
+# don't make this into a binary variable--urban_pop, urban_num, urban_num_twolev,
+# urban_num_twolev--1 is urban, 2 rural
+
+```
+
+## Model Selection using AIC
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+new_drugsdf <- new_drugsdf |>
+  select(Drug_Overdose_Deaths, Unemployment_Rate, Income_Inequality, Median_House_Income, Adult_Smoking_Rate, Highschool_Comp_Rate, suicides, mental_ratio, Social_Associations, Female_Pop, urban_num_twolev, urban_num, urban_level, region, state_abbreviation) |>
+  drop_na()
+
+library(lme4)
+library(caret)
+fixed_no_urban <-lm(Drug_Overdose_Deaths~Unemployment_Rate + Income_Inequality + Median_House_Income + Adult_Smoking_Rate + Highschool_Comp_Rate + Social_Associations + Female_Pop + mental_ratio+ suicides, data=new_drugsdf)
+
+fixed_urban <-lm(Drug_Overdose_Deaths~Unemployment_Rate + Income_Inequality + Median_House_Income + Adult_Smoking_Rate + Highschool_Comp_Rate + Social_Associations + Female_Pop + urban_num_twolev+ mental_ratio+ suicides, data=new_drugsdf)
+
+random_urban <-lmer(Drug_Overdose_Deaths~Unemployment_Rate + Income_Inequality + Median_House_Income + Adult_Smoking_Rate + Highschool_Comp_Rate + Social_Associations + Female_Pop +  mental_ratio+ suicides +(1|urban_level), data=new_drugsdf)
+
+random_state <-lmer(Drug_Overdose_Deaths~Unemployment_Rate + Income_Inequality + Median_House_Income + Adult_Smoking_Rate + Highschool_Comp_Rate + Social_Associations + Female_Pop + urban_num_twolev + mental_ratio+ suicides+(1|state_abbreviation), data=new_drugsdf)
+
+random_region <- lmer(Drug_Overdose_Deaths~Unemployment_Rate + Income_Inequality + Median_House_Income + Adult_Smoking_Rate + Highschool_Comp_Rate + Social_Associations + Female_Pop + urban_num_twolev + mental_ratio+ suicides+ (1|region), data=new_drugsdf)
+
+AIC(fixed_no_urban, fixed_urban, random_urban, random_region, random_state)
+
+# arm::plot(fitted(random_state), residuals(random_state))
+# 
+# summary(random_state)
+```
+
+Using AIC score as a metric for model generalizability via leave one out cross validation, we can see that the model with state as random intercept has the lowest AIC.
+
+## Checking model assumptions
+
+```{r}
+library(arm)
+library(lme4)  # arm relies on lme4 for fitting mixed models
+library(car)
+
+plot(fitted(random_state), residuals(random_state))
+#summary(random_state)
+
+```
+
+Fan shape in the fitted vs residuals plot, suggesting we need to apply a transformation. Try log transformation on the response variable
+
+## Log-Transform Drug_overdose_deaths (response variable)
+
+```{r}
+
+log_random_state <-lmer(log(Drug_Overdose_Deaths)~Unemployment_Rate + Income_Inequality + Median_House_Income + Adult_Smoking_Rate + Highschool_Comp_Rate + Social_Associations + Female_Pop + urban_num_twolev + mental_ratio+ suicides +(1|state_abbreviation), data=new_drugsdf)
+
+plot(fitted(log_random_state), residuals(log_random_state))
+# AIC(log_fixed_no_urban, log_fixed_urban, log_random_urban, log_random_state)
+
+# log_random_s <-lmer(log(Drug_Overdose_Deaths)~Unemployment_Rate + Income_Inequality + Median_House_Income + Adult_Smoking_Rate + Highschool_Comp_Rate + Social_Associations + Female_Pop + mental_ratio+ suicides +(1|state_abbreviation), data=selected_data)
+
+
+```
+
+## Plot (fixed) coefficient estimates (issues with this)
+
+```{r}
+summary(log_random_state)
+confint(log_random_state)
+
+library(lmerTest)
+
+model_random_state = summary(log_random_state)
+coefficients <- model_random_state$coefficients[2:11, 1] 
+conf_intervals <- confint(log_random_state, level = 0.95, oldNames=FALSE)
+
+coef_df <- data.frame(
+  Predictor = c('Unemployment Rate', 'Income Inequality',
+                'Median Income', 'Smoking Rate', 'Highschool Comp Rate', 
+                'Social Associations', '% Female', 'Urbanization', 'Mental Health Providers ratio', 'Suicide rate'),
+  Estimate = coefficients,
+  #StdError = coefficients[, "Std. Error"],
+  ConfLow = conf_intervals[4:13, "2.5 %"],
+  ConfHigh = conf_intervals[4:13, "97.5 %"]
+)
+# term = fct_reorder(term, estimate)
+
+
+ggplot(coef_df, aes(x = Estimate, y = reorder(Predictor, Estimate), xmin = ConfLow, xmax = ConfHigh)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  geom_errorbarh(height = 0.2, linewidth = 1.4, color = "red", show.legend = FALSE) +
+  geom_point(size = 1.5, shape = 21, fill = "black", show.legend = FALSE) +
+  labs(title = "Fixed Effects Estimates for Drug Overdose Deaths",
+       x = "Coefficient",
+       y = "Predictors") +
+  labs(y = NULL) +
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 16),      # Title text size
+    axis.title.x = element_text(size = 14),                   # X-axis title text size
+    axis.title.y = element_text(size = 14),                   # Y-axis title text size
+    axis.text.x = element_text(size = 12),                    # X-axis text size
+    axis.text.y = element_text(size = 12),                    # Y-axis text size
+    legend.text = element_text(size = 12)                      # Legend text size
+  )
+  
+
+abline(v = 0, col = "black", lwd = 2, lty = 2)
+log_random_state
+```
+
+High suicide rate, % female, smoking rate, urbanization, income inequality is associated with high drug overdose. Low median income and low social associations is associated with low drug overdose.
+urban has the most num of observations  in urban_num_two_lev
+
+maybe use drug_overdose_deaths for each race 
+Drug_Overdose_Deaths_asian=drug_overdose_deaths_aian,
+    Drug_Overdose_Deaths_pacific=drug_overdose_deaths_asian_pacific_islander,
+    Drug_Overdose_Deaths_black=drug_overdose_deaths_black
+    
+    
+## Plot correlation matrix
+
+```{r}
+new_drugsdf_num <- new_drugsdf |>
+  dplyr::select(!c(urban_num_twolev, region, state_abbreviation, urban_level, urban_num))
+
+corr_mat<-cor(new_drugsdf_num)
+# Plot the heat map
+library(ggcorrplot)
+ggcorrplot(corr_mat, method = "circle", type = "full", 
+           lab = TRUE, lab_size = 3, 
+           title = "Correlation Heat Map", 
+           colors = c("blue", "white", "red"))
+
+# library(ggplot2)
+# ggplot(data=corr_mat, aes())
+
+```
+    
+## Differences between rural and urban counties
+
+```{r}
+# two df--urban and rural counties
+drugs_urban=new_drugsdf |>
+  filter(urban_num_twolev==1)
+
+drugs_rural=new_drugsdf |>
+  filter(urban_num_twolev==2)
+
+log_random_state_urban <-lmer(log(Drug_Overdose_Deaths)~Unemployment_Rate + Income_Inequality + Median_House_Income + Adult_Smoking_Rate + Highschool_Comp_Rate + Social_Associations + Female_Pop + mental_ratio+ suicides +(1|state_abbreviation), data=drugs_urban)
+log_state_urban <-lm(log(Drug_Overdose_Deaths)~Unemployment_Rate + Income_Inequality + Median_House_Income + Adult_Smoking_Rate + Highschool_Comp_Rate + Social_Associations + Female_Pop + mental_ratio+ suicides, data=drugs_urban)
+
+anova(log_random_state_urban, log_state_urban )
+```
+    
+## Plot (random) coefficient estimates 
+
+```{r}
+library(lme4)
+library(broom.mixed)
+example(lmer)
+
+# create get estimates effects of state 
+
+# exclude fixed effects
+# create a plot that visualizes the different intercepts for random state and CI
+
+# conf.low and conf.high gives 95% confidence interval
+tidy_model <- tidy(random_state, effects="ran_vals", conf.int = TRUE)
+
+library(forcats)
+
+# ADD THIS--reordering the levels
+tidy_model$level <- fct_reorder(tidy_model$level, tidy_model$estimate)
+
+ggplot(tidy_model, aes(y = estimate, x = level, ymin = conf.low, ymax = conf.high)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  geom_errorbar(width = 0.2, linewidth = 1.4, color = "red", show.legend = FALSE) +
+  geom_point(size = 1.5, shape = 21, fill = "black", show.legend = FALSE) +
+  labs(title = "Random Effects Estimates for Drug Overdose Deaths",
+       y = "Intercept Estimates",
+       x = "State") +
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 16),      # Title text size
+    axis.title.x = element_text(size = 14),    # X-axis title text size
+    axis.title.y = element_text(size = 14),    # Y-axis title text size
+    axis.text.x = element_text(size = 6.7),     # X-axis text size
+    axis.text.y = element_text(size = 12)      # Y-axis text size
+  )
+```
+
+There is clear baseline variability in drug overdose deaths across states. Most notably, West Virginia has the the highest baseline drug overdose deaths
+
+## Map of (random) coefficient estimates 
+
+```{r}
+# filtered_tidy <- tidy_model %>%
+#   filter((conf.low > 0 & conf.high > 0) | (conf.low < 0 & conf.high < 0))
+library(dplyr)
+filtered_tidy_high <- tidy_model %>%
+  filter((conf.low > 0 & conf.high > 0)) |>
+  arrange(desc(level)) |>
+  dplyr::select(level, estimate) # states that have baseline high intercepts in desc order
+
+```
+
+
+```{r}
+# Install and load required packages
+# install.packages("ggplot2")
+# install.packages("maps")
+
+library(ggplot2)
+library(maps)
+
+# Get the map data
+us_map <- map_data("state")
+
+# Create a data frame with states and values for coloring
+set.seed(123)
+states <- unique(us_map$region)
+values <- runif(length(states), min = 1, max = 100) # do an if-else region
+df_values <- data.frame(region = states, value = values)
+df_values$level<- state.abb[match(tolower(df_values$region), tolower(state.name))]
+df_values <- df_values %>%
+  mutate(level = ifelse(is.na(level), "DC", level)) 
+
+merged_df_values <- left_join(df_values, filtered_tidy_high, by="level")
+# df_values[1]['abbreviation'] = 'DC'
+# df_values <- df_values |>
+#   filter(region == 'district of columbia') |>
+#   select(abbreviation) |>
+  
+
+# Merge the map data with your data frame
+us_map <- merge(us_map, merged_df_values, by = "region")
+
+# Plot the map
+ggplot(data = us_map, aes(x = long, y = lat, group = group, fill = estimate)) +
+  geom_polygon(color = "black") +
+  coord_fixed(1.3) +
+  labs(fill = "Baseline Drug Overdoses") +
+  theme_void() +
+  theme(legend.position = "right")
+
+```
+
+States in midwest and east coast (region 3 and 4) have highest baseline drug overdoses--deaths not attributed to the predictors in the model. Thus, we should prioritize drug overdose prevention efforts on these states.  
+
+plot drug overdoses across west virginia 
