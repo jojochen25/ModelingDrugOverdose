@@ -1,0 +1,653 @@
+---
+title: "Understanding the Increase in Drug Overdose and Alcohol Driving Deaths"
+author: 
+- Dennis Campoverde-Lema
+- Samantha Parras 
+- Jodie Chen 
+date: "July 26, 2024"
+toc: true
+format:
+  html:
+    theme: cosmo
+    html-math-method: katex
+    self-contained: true
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+# Introduction
+
+In 2022, 46.8 million Americans who were twelve years of age or older struggled with a drug use disorder.  Eight million Americans aged twelve and older battled alcohol and drug use issues at the same time that year.  Use of drugs and alcohol has substantial financial consequences. Every year, excessive alcohol use costs 249 billion dollars in lost productivity, medical expenditures, and criminal justice costs. In contrast, illicit drug usage costs 193 billion dollars in lost productivity, criminality, and medical costs. Communities can benefit from adopting and putting into practice policies that lessen prescription drug abuse and excessive alcohol consumption.
+
+From this information, the question we are going to answer, is there demographic and social factors that are predictors of drug overdose and alcohol-related incidents (e.g., driving accidents)?
+
+Our hypothesis we came to is, the chances of drug overdoses and alcohol-related driving incidents can be predicted by demographic factors like age, gender, and race as well as social factors like substance use habits and socioeconomic status. 
+
+Certain demographic variables—like age, gender, and race—have a major impact on the risk of drug overdoses and incidents involving alcohol and driving. For example, middle-aged people may be at risk from long-term substance use, while younger people may be at risk from peer pressure and experimentation.
+Another important factor is gender: it's possible that men experience higher rates of substance abuse and related incidents than women do, possibly as a result of differing social behaviors and stress reactions. Differences in socioeconomic status, community support, and access to healthcare can all contribute to racial disparities.
+Social factors hold equal significance. Substance use patterns, such as the kind and quantity of drugs or alcohol consumed, are strong indicators of incidents linked to substance use. Furthermore, access to treatment or preventive resources, as well as patterns of substance use, can be influenced by socioeconomic status, which includes factors like education, work status, and income level.
+Tailored interventions can be devised through the identification and comprehension of these demographic and social variables. By customizing these interventions to target particular high-risk populations, their effectiveness can be increased and the population's overall rate of drug overdoses and alcohol-related driving accidents can be decreased.
+
+
+# Data
+
+The data is collected by the University of Wisconsin Population Health Institute. It assigns a ranking based on health outcomes and health factors to each county in every state. There were originally 770 variables in the data set. Since the data set is so big, another data set was created with only the variables related to drug overdose deaths and alcohol-impaired driving deaths. Predictor variables are drug overdose deaths and alcohol-impaired driving deaths.
+
+Here are some of the predictor variables picked and the reason for selecting them:
+
+**Unemployment:** Compared to the employed population, the unemployed population has worse health and higher death rates. 
+
+**Median Income:** The impact of median household income on the likelihood of poverty on individuals and families can have detrimental effects on their mental and physical well-being.
+
+**Disconnected Youth:** Disconnected youth have a higher likelihood of experiencing violence, smoking, drinking, and using marijuana.
+
+**High School Graduation:** A higher level of education is linked to a lower likelihood of smoking. Adults with higher levels of education typically have more employment opportunities and make more money overall.
+
+**Social Associations:** Reduced participation in communal life and little social interaction with others are linked to higher rates of illness and early death. Compared to those with strong networks, those without strong social networks are less likely to choose healthy lifestyles.
+
+
+```{r} 
+library(janitor)
+library(ggplot2)
+library(tidyverse)
+library(sf)
+library(dplyr)
+library(broom)
+library(VIM)
+library(ggfortify)
+library(class)
+
+
+```
+
+
+```{r, include=FALSE}
+
+health_data_alc <- read_csv("final_data copy.csv")
+
+
+health_data_alc <- health_data_alc |> 
+  select(-name, -...1, -population, -drug_overdose_deaths,-homicides, -adult_smoking) |> 
+  filter(!is.na(alcohol_impaired_driving_deaths))
+ 
+health_data_alc <- na.omit(health_data_alc)
+
+
+health_data_drug <- read_csv("final_data copy.csv")
+
+health_data_drug <- health_data_drug |> 
+  select(-name, -...1, -population, -alcohol_impaired_driving_deaths,-homicides) |> 
+  filter(!is.na(drug_overdose_deaths))
+
+health_data_drug <- na.omit(health_data_drug)
+
+```
+ 
+Upon inspection, the variable of drug overdose deaths was found to have many N/A values, and it is important to ensure this variable is clean as it is one of the main variables to be analyzed. Additionally, rename the data so that it can be read easier and look presentable for any visuals. 
+
+```{r, include=FALSE} 
+
+```
+
+# Intial EDA 
+
+Looking at the states with respect to drug overdose deaths and alcohol-impaired driving deaths, the areas with the most issues can be identified, and solutions can eventually be developed.
+
+```{r, include=FALSE} 
+health_data <- read.csv("analytic_data2024 copy.csv") %>%  
+  clean_names()
+
+selected_data <- health_data %>% 
+  select(
+    state_fips_code, county_fips_code, state_abbreviation, name,
+    drug_overdose_deaths_raw_value, alcohol_impaired_driving_deaths_raw_value,
+    unemployment_raw_value, income_inequality_raw_value, high_school_completion_raw_value, 
+    adult_smoking_raw_value, excessive_drinking_raw_value, median_household_income_raw_value,
+    some_college_raw_value, children_in_poverty_raw_value, children_in_single_parent_households_raw_value,
+    social_associations_raw_value, x_below_18_years_of_age_raw_value, 
+    x_65_and_older_raw_value, x_non_hispanic_black_raw_value, 
+    x_american_indian_or_alaska_native_raw_value, x_asian_raw_value, 
+    x_native_hawaiian_or_other_pacific_islander_raw_value, x_hispanic_raw_value, 
+    x_non_hispanic_white_raw_value, x_not_proficient_in_english_raw_value, 
+    x_female_raw_value, x_rural_raw_value, population_raw_value
+  )
+
+selected_data <- selected_data |> 
+  mutate(across(
+    starts_with("drug_overdose_deaths_raw_value") | starts_with("alcohol_impaired_driving_deaths_raw_value") |
+      starts_with("unemployment_raw_value") | starts_with("income_inequality_raw_value") | 
+      starts_with("high_school_completion_raw_value") | starts_with("adult_smoking_raw_value") |
+      starts_with("excessive_drinking_raw_value") | starts_with("median_household_income_raw_value") |
+      starts_with("some_college_raw_value") | starts_with("children_in_poverty_raw_value") | 
+      starts_with("children_in_single_parent_households_raw_value") | 
+      starts_with("social_associations_raw_value") | starts_with("x_below_18_years_of_age_raw_value") | 
+      starts_with("x_65_and_older_raw_value") | starts_with("x_non_hispanic_black_raw_value") | 
+      starts_with("x_american_indian_or_alaska_native_raw_value") | starts_with("x_asian_raw_value") | 
+      starts_with("x_native_hawaiian_or_other_pacific_islander_raw_value") | starts_with("x_hispanic_raw_value") | 
+      starts_with("x_non_hispanic_white_raw_value") | starts_with("x_not_proficient_in_english_raw_value") | 
+      starts_with("x_female_raw_value") | starts_with("x_rural_raw_value") | starts_with("population_raw_value"),
+    as.numeric
+  ))
+```
+
+
+```{r} 
+library(maps)
+state_data <- selected_data |>
+  filter(county_fips_code=='000',state_abbreviation!="US", state_abbreviation !="DC") |>  
+  rename(state=name) 
+state_data$state <- tolower(state_data$state)
+
+us_states_map <- map_data("state")
+
+merged_data <- us_states_map %>%
+  left_join(state_data, by = c("region" = "state"))
+
+ggplot(data = merged_data, aes(x = long, y = lat, group = group)) +
+  geom_polygon(aes(fill = drug_overdose_deaths_raw_value), color = "white") +
+  scale_fill_gradient(low = "blue", high = "red", na.value = "grey50") +
+  coord_fixed(1.3)+
+ theme_bw() +  # Apply the minimal theme
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(), 
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 20),  
+    plot.subtitle = element_text(hjust = 0.5, face = "plain", size = 8),   
+    plot.caption = element_text(face = "italic", size = 8, hjust = 0)  
+  ) +
+  labs(
+    title = "Drug Overdose Deaths by State",
+    fill = "*Drug Overdose Deaths", 
+    caption = "*Per 100,000 population",
+  ) +
+  annotate(
+    "text", x = Inf, y = -Inf, label = "Figure 1", 
+    hjust = 1.1, vjust = -1.1, size = 5, colour = "black"
+  )
+
+ggplot(data = merged_data, aes(x = long, y = lat, group = group)) +
+  geom_polygon(aes(fill = alcohol_impaired_driving_deaths_raw_value), color = "white") +
+  scale_fill_gradient(low = "blue", high = "red", na.value = "grey50",labels = scales::percent_format(scale = 100)) +
+  coord_fixed(1.3) +
+  theme_bw() +  # Apply the minimal theme
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),  
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 15),  
+    plot.subtitle = element_text(hjust = 0.5, face = "plain", size = 8),  
+    plot.caption = element_text(face = "italic", size = 8, hjust = 0))+
+  labs(
+    title = "Alcohol Impaired Driving Deaths by State",
+    fill = "*Alcohol Driving Deaths",
+    caption = "*Percentage of motor vehicle crash deaths with alcohol involvement.",
+  )+
+  annotate(
+    "text", x = Inf, y = -Inf, label = "Figure 2", 
+    hjust = 1.1, vjust = -1.1, size = 5, colour = "black"
+  )
+
+
+
+```
+
+In **Figure 1**West Virginia has the highest amount of drug overdose deaths. By conducting further research on West Virginia, it was found that the state leads the nation in opioid-related drug overdose deaths. According to the Drug Enforcement Administration, West Virginia has one of the highest prescription rates for opioids in the country and also has a high prevalence of controlled prescription drug addiction and trafficking. Furthermore, the usage of illegal prescription drugs was a factor in almost 61% of state overdose deaths in 2015.
+
+In **Figure 2** alcohol-impaired driving deaths, Montana had the highest amount of deaths resulting from alcohol-impaired driving. According to Forbes, Montana has the highest rate of drunk driving, with 8.57 fatal crashes involving drunk drivers for every 100,000 licensed drivers and 7.14 fatal crashes involving drunk drivers for every 100,000 state population. These rates are the highest in the country. Montana has the highest percentage of drunk drivers in the country—more than two-fifths (43.51%) of road fatalities.
+
+By analyzing the predictors of both drug overdose deaths and alcohol-impaired driving deaths, solutions and regulations can hopefully be developed to help these states with their ongoing problems. 
+
+
+```{r}
+
+selected_data$`Income level` <- cut(selected_data$median_household_income_raw_value,
+                                    breaks = c(-Inf, 52610, 60986, 70897, Inf),
+                                    labels = c("Low", "Lower-Middle", "Upper-Middle", "High"),
+                                    right = TRUE, na.rm=TRUE)
+
+filtered_data <- selected_data[!is.na(selected_data$`Income level`), ]
+
+ggplot(filtered_data, aes(x = adult_smoking_raw_value, y = drug_overdose_deaths_raw_value)) +
+  geom_point(size = 2, alpha = 0.7, aes(color = `Income level`)) +
+  geom_smooth(method = 'lm', se = TRUE, color = "black") +
+  theme_bw() +
+  scale_x_continuous(labels = scales::percent_format()) +
+  labs(title = "Smoking Rate Relationship With Drug Overdose",
+       x = 'Adult Smoking Rate',
+       y = 'Drug Overdose Deaths per 100,000 population') +
+  scale_color_manual(values = c("Low" = "darkred", "Lower-Middle" = "red", "Upper-Middle" = "blue", "High" = "darkblue")) + 
+  theme(
+    plot.title = element_text(size = 16),
+    legend.title = element_text(size=15), 
+    legend.text = element_text(size=15)) +
+  annotate(
+    "text", x = Inf, y = -Inf, label = "Figure 3", 
+    hjust = 1.1, vjust = -1.1, size = 5, colour = "black"
+  )
+
+```
+**Figure 3**, which is broken down by income level, shows the correlation between adult smoking rates and the number of drug overdose deaths per 100,000 people. The trend line shows a positive association, implying that there is a connection between an increase in drug overdose deaths and rising smoking rates. Dark red areas are low-income areas, which tend to cluster in the higher ranges of both smoking rates and overdose deaths. High-income areas, indicated in dark blue, on the other hand, typically have lower smoking rates and fewer overdose deaths.
+
+
+
+# Modeling (go back on this)
+
+We decided on a linear regression model and variations of linear regression--Ridge, Lasso, and Elastic Net to assist with feature selection. Ridge and Lasso regression are methods that reduce multicollinearity by imposing regularization penalties. Ridge is more conservative as it reduces the magnitude of coefficients by shrinking coefficients to near zero, while retaining all variables. Lasso on the other hand penalizes the model more by shrinking coefficients to exactly zero which removes unimportant variables from the model, making it extremely effective in reducing overfitting. Lasso Elastic Net is a balanced approach to variable selection and regularization that incorporates the strengths of both Ridge and Lasso. Finally, Random Forest, an ensemble method, is a potent instrument for managing intricate datasets due to its ability to capture non-linear relationships and interactions between variables, which provides both flexibility and robustness. We are able to identify the most effective predictive techniques and obtain a deeper understanding of the underlying patterns by conducting a comprehensive evaluation of our data using these diverse models.
+
+
+**K-Fold Cross-Validation** 
+
+This is a good way to check that the data is correct: the original data is randomly split into k equal parts. The model is trained with $k-1$ parts, and one part is set away to test it. This process is done $k$ times, with a new part being tested each time. Finally, the scores from all k tests are added together to get a single estimate of how well the program worked.
+
+**Steps Taken:**
+
+**Preparing the Data:** For cross-validation, we divided the data into five folds. One fold was used as a test set, and the other four folds were used as training sets.
+
+**Training as a Model:** The training data was used to teach the five models how to work with each shape.
+
+**Making Predictions:** Then, to see how well each model worked, we found its Root Mean Squared Error (RMSE). The RMSE numbers for each model were compared across all folds. The RMSE is a standard way to figure out how well a model predicts numeric data; lower RMSE numbers mean the model that has the least amount of error. "Most of the time". 
+
+```{r}
+
+library(dplyr)
+library(glmnet)
+library(tidyr)
+library(randomForest)
+
+
+set.seed(101)
+k <- 5
+health_data_drug <- health_data_drug |>
+  mutate(test_fold = sample(rep(1:k, length.out = n())))
+
+get_test_pred <- function(k) {
+  test_data <- health_data_drug |>  filter(test_fold == k)                     # get test and training data
+  train_data <- health_data_drug |>  filter(test_fold != k)
+  test_x <- as.matrix(select(test_data, -drug_overdose_deaths))            # get test and training matrices
+  train_x <- as.matrix(select(train_data, -drug_overdose_deaths))
+  
+  lm_fit <- lm(drug_overdose_deaths ~ ., data = train_data)                  # fit models to training data
+  ridge_fit <- cv.glmnet(train_x, train_data$drug_overdose_deaths, alpha = 0)
+  lasso_fit <- cv.glmnet(train_x, train_data$drug_overdose_deaths, alpha = 1)
+  enet_fit <- cv.glmnet(train_x, train_data$drug_overdose_deaths, alpha = 0.5)
+  rf_fit <- randomForest(drug_overdose_deaths ~ ., data = train_data, importance = TRUE)
+  
+  tibble(lm_pred = predict(lm_fit, newdata = test_data),              # return test results
+         ridge_pred = as.numeric(predict(ridge_fit, newx = test_x)),
+         lasso_pred = as.numeric(predict(lasso_fit, newx = test_x)),
+         enet_pred = as.numeric(predict(enet_fit, newx = test_x)),
+         rf_pred = predict(rf_fit, newdata = test_data),
+         test_actual = test_data$drug_overdose_deaths,
+         test_fold = k)
+}
+
+# Initialize an empty tibble to store the results
+test_pred_all <- tibble()
+
+# Loop over the values from 1 to k and apply the get_test_pred function
+for (i in 1:k) {
+  test_pred_all <- bind_rows(test_pred_all, get_test_pred(i))
+}
+
+
+test_pred_all |>
+  pivot_longer(lm_pred:rf_pred, 
+               names_to = "type", 
+               values_to = "test_pred") |>
+  group_by(type, test_fold) |>
+  summarize(
+    rmse = sqrt(mean((test_actual - test_pred)^2))
+  ) |> 
+  ggplot(aes(x = type, y = rmse)) + 
+  geom_point(size = 4) +
+  stat_summary(fun = mean, geom = "point", 
+               color = "red", size = 4) + 
+  stat_summary(fun.data = mean_se, geom = "errorbar", 
+               color = "red", width = 0.2) + 
+  theme_bw() +
+  labs(title="Model Performance for Drug Overdose Deaths", 
+       y = 'Root Mean Squared Error',
+       x = NULL) +
+  theme(
+    axis.title = element_text(size = 14),
+    axis.text.y = element_text(size = 14, ),
+    axis.text.x = element_text(size= 14, ),
+    plot.title = element_text(size = 20)
+  ) +
+  scale_x_discrete(labels=c("enet_pred"="Elastic","lasso_pred"="Lasso","lm_pred"="Linear","rf_pred" = "Random Forest", "ridge_pred"="Ridge")) +
+  annotate(
+    "text", x = Inf, y = -Inf, label = "Figure 4", 
+    hjust = 1.1, vjust = -1.1, size = 5, colour = "black"
+  )
+```
+
+We chose Random Forest for predicting drug overdose deaths because it demonstrated lower and more consistent RMSE values compared to other models, as shown in **Figure 4**. Its ability to capture complex, non-linear relationships makes it particularly effective for this analysis.
+
+```{r}
+
+set.seed(101)
+k <- 5
+health_data_alc <- health_data_alc |>
+  mutate(test_fold = sample(rep(1:k, length.out = n())))
+
+
+get_test_pred <- function(k) {
+  test_data <- health_data_alc |>  filter(test_fold == k)                     # get test and training data
+  train_data <- health_data_alc |>  filter(test_fold != k)
+  test_x <- as.matrix(select(test_data, -alcohol_impaired_driving_deaths))            # get test and training matrices
+  train_x <- as.matrix(select(train_data, -alcohol_impaired_driving_deaths))
+  
+  lm_fit <- lm(alcohol_impaired_driving_deaths ~ ., data = train_data)                  # fit models to training data
+  ridge_fit <- cv.glmnet(train_x, train_data$alcohol_impaired_driving_deaths, alpha = 0)
+  lasso_fit <- cv.glmnet(train_x, train_data$alcohol_impaired_driving_deaths, alpha = 1)
+  enet_fit <- cv.glmnet(train_x, train_data$alcohol_impaired_driving_deaths, alpha = 0.5)
+  rf_fit <- randomForest(alcohol_impaired_driving_deaths ~ ., data = train_data, importance = TRUE)
+  
+  tibble(lm_pred = predict(lm_fit, newdata = test_data),              # return test results
+         ridge_pred = as.numeric(predict(ridge_fit, newx = test_x)),
+         lasso_pred = as.numeric(predict(lasso_fit, newx = test_x)),
+         enet_pred = as.numeric(predict(enet_fit, newx = test_x)),
+         rf_pred = predict(rf_fit, newdata = test_data),
+         test_actual = test_data$alcohol_impaired_driving_deaths,
+         test_fold = k)
+}
+
+# Initialize an empty tibble to store the results
+test_pred_all <- tibble()
+
+# Loop over the values from 1 to k and apply the get_test_pred function
+for (i in 1:k) {
+  test_pred_all <- bind_rows(test_pred_all, get_test_pred(i))
+}
+
+test_pred_all |>
+  pivot_longer(lm_pred:rf_pred, 
+               names_to = "type", 
+               values_to = "test_pred") |>
+  group_by(type, test_fold) |>
+  summarize(
+    rmse = sqrt(mean((test_actual - test_pred)^2))
+  ) |> 
+  ggplot(aes(x = type, y = rmse)) + 
+  geom_point(size = 4) +
+  stat_summary(fun = mean, geom = "point", 
+               color = "red", size = 4) + 
+  stat_summary(fun.data = mean_se, geom = "errorbar", 
+               color = "red", width = 0.2) + 
+  theme_bw() +
+  labs( title="Train and Test: Alcohol Impaired Driving Deaths", 
+         y = 'Root Mean Squared Error',
+        x = NULL) +
+  theme(
+    axis.title = element_text(size = 14),
+    axis.text.y = element_text(size = 14, ),
+    axis.text.x = element_text(size= 14, ),
+    plot.title = element_text(size = 20)
+  ) +
+  scale_x_discrete(labels=c("enet_pred"="Elastic","lasso_pred"="Lasso","lm_pred"="Linear","rf_pred" = "Random Forest", "ridge_pred"="Ridge")) +
+  annotate(
+    "text", x = Inf, y = -Inf, label = "Figure 5", 
+    hjust = 1.1, vjust = -1.1, size = 5, colour = "black"
+  )
+
+```
+
+We chose the Linear model for predicting alcohol-impaired driving deaths because it demonstrated the lowest and most consistent RMSE values, as shown in **Figure 5**. However, given the overlapping error margins with other models, one could argue for the use of alternative methods, as no single model shows a clear advantage.
+
+
+# Results
+
+Looking at Alcohol Impaired Driving Deaths predictors using linear model lm() function. We also used 95% confidence intervals more more accurate results. 
+
+```{r}
+
+alcohol_lm <- lm(alcohol_impaired_driving_deaths ~ . , data=health_data_alc)
+
+alcohol_lm |>
+  tidy(conf.int = T) |>
+  filter(term != "test_fold") |> 
+  mutate(
+    term = gsub("_", " ", term),
+    term = sapply(term, function(x) { paste(toupper(substring(x, 1, 1)), substring(x, 2), sep = "", collapse = " ") }), 
+    term = case_when(
+      p.value <= 0.001 ~ paste0(term, "***"),
+      p.value <= 0.01 ~ paste0(term, "**"),
+      p.value <= 0.05 ~ paste0(term, "*"),
+      p.value <= 0.1 ~ paste0(term, "."),
+      TRUE ~ term
+    ),
+    term = fct_reorder(term, estimate)
+  ) |> 
+  ggplot(aes(x = estimate, y = term, fill = estimate)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  geom_errorbarh(aes(xmin =conf.low, xmax =conf.high),
+                 height = 0.2, linewidth = 2, color = "red", show.legend = FALSE) +
+  geom_point(aes(color = estimate), size = 1.8, shape = 21, fill = "black", show.legend = FALSE) +
+  labs(y = NULL,x="Coefficient") +
+  theme_bw() +
+  labs( title="Linear Model for Alcohol Impaired Driving Deaths") +
+  theme(
+    axis.title = element_text(size = 15),
+    axis.text.y = element_text(size = 14, ),
+    axis.text = element_text(size = 15, ),
+    axis.title.x = element_text(size= 11, ),
+    plot.title = element_text(size = 12)
+  ) +
+  annotate(
+    "text", x = Inf, y = -Inf, label = "Figure 6", 
+    hjust = 1.1, vjust = -1.1, size = 5, colour = "black"
+  )
+
+```
+Looking at **Figure 6**, Unemployment is the top predictor for alcohol impaired driving deaths. Holding all other variables constant, if unemployment rate increases by 1%, alcohol impaired driving deaths is projected to increase by 1.3%. Other significant predictors are Excessive Drinking, Suicides, and Population Density.  
+
+```{r, include = FALSE}
+
+library(tidyverse)
+library(glmnet)
+library(broom)
+library(ggfortify)  
+
+heal <- read_csv("data/final_data.csv")
+
+# remove population density--15.36785
+# with population density
+drugs_df <- heal |> 
+  select(-name, -...1, -population_density, -population, -alcohol_impaired_driving_deaths, -homicides, -excessive_drinking) 
+
+
+drugs_df |>  summarise(across(everything(), ~ sum(is.na(.))))
+
+
+drugs_df <- na.omit(drugs_df)
+
+response <- drugs_df$drug_overdose_deaths
+predictors <- as.matrix(drugs_df |>  select(-drug_overdose_deaths))
+
+set.seed(123)  # For reproducibility
+# cv_fit <- cv.glmnet(predictors, response, alpha = 1, nfolds = 10)
+# 
+# print(cv_fit)
+# 
+# plot(cv_fit)
+
+# cv(random forest model)
+
+# finetune mtry (num of predictors at each split)
+
+
+train<-drugs_df |>
+  slice_sample(prop=0.5)
+test<-drugs_df|>
+  anti_join(train)
+
+x_train<- train |>
+  select(-drug_overdose_deaths) |>
+  as.matrix()
+
+x_test <- test |>
+  select(-drug_overdose_deaths) |>
+  as.matrix()
+
+library(caret)
+library(tidyverse)
+library(ranger)
+library(randomForest)
+
+rf_tune_grid <- 
+  data.frame(mtry = seq(3, 5, 8), 
+           splitrule = "variance",
+           min.node.size = 5)
+set.seed(123)
+drug_overdose_rf <- train(drug_overdose_deaths ~ ., data = train,
+        method = "ranger", num.trees = 500,
+        trControl = trainControl(method = "cv", number = 10),
+        tuneGrid = rf_tune_grid, importance="impurity")
+
+drug_overdose_rf # gives in sample evaluation 12.08305 (average across all 10 test folds)
+predictions = predict(drug_overdose_rf, newdata=test) # predicted drug overdose deaths for all the counties
+
+
+RMSE_test = sqrt(mean((test$drug_overdose_deaths - predictions)^2)) # out of sample evaluation is 13.46791
+RMSE_test
+
+# limiting 5 to 6 variables
+
+library(vip)
+var_imp<-varImp(drug_overdose_rf)
+
+
+
+
+var_imp_df <- as.data.frame(var_imp$importance)
+var_imp_df$Variable <- rownames(var_imp_df)
+colnames(var_imp_df)[1] <- "Importance"
+
+# Clean up the y-axis names
+var_imp_df$Variable <- gsub("_", " ", var_imp_df$Variable)
+
+```
+
+```{r}
+library(tools)
+var_imp_df$Variable <- toTitleCase(var_imp_df$Variable)
+
+# Plot the variable importance
+ggplot(var_imp_df, aes(x = Importance, y = reorder(Variable, Importance))) +
+  geom_point(color = "red", size = 3) +
+  labs(title = "Random Forest Model for Drug Over Dose Deaths", x = "Importance", y = NULL) +
+  theme_bw() +
+  theme(axis.text.y = element_text(size = 12)) +
+  theme(
+    axis.title = element_text(size = 15),
+    axis.text.y = element_text(size = 12, ),
+    axis.text = element_text(size = 15, ),
+    axis.title.x = element_text(size= 11, ),
+    plot.title = element_text(size = 12)
+  ) +
+  annotate(
+    "text", x = Inf, y = -Inf, label = "Figure 7", 
+    hjust = 1.1, vjust = -1.1, size = 5, colour = "black"
+  )
+```
+
+Looking at **Figure 7**, the model predicts on average a high number of drug overdose deaths for counties with high unemployment rate (compared to the average unemployment in the US of 3.5%). Similarly, the higher the percentage of adults that smoke, the higher the predicted drug overdose deaths.
+
+```{r}
+# eda 
+library(caret)
+library(pdp)
+library(gridExtra)
+# pdp_hispanic<-drug_overdose_rf |>
+#   pdp::partial(pred.var="hispanic") |>
+#   autoplot()
+
+
+pdp_unemployment<-drug_overdose_rf |>
+  pdp::partial(pred.var="unemployment") |>
+  autoplot()
+
+pdp_adult_smoking<-drug_overdose_rf |>
+  pdp::partial(pred.var="adult_smoking") |>
+  autoplot()
+
+pdp_children<-drug_overdose_rf |>
+  pdp::partial(pred.var="children_in_single_parent_households") |>
+  autoplot()
+
+plot_unemployment <- autoplot(pdp_unemployment)
+plot_adult_smoking <- autoplot(pdp_adult_smoking)
+
+plot_unemployment <- plot_unemployment + theme_bw() + geom_line(color = "red") 
++ labs(x="Unemployment Rate", y="Drug Overdose Deaths") 
+
+plot_adult_smoking <- plot_adult_smoking + xlim(0, 0.04) + theme_bw()+ geom_line(color = "red") + labs(x="Adult Smoking Rate", y="Drug Overdose Deaths") 
+
+pdp_children <- pdp_children + theme_bw()+ + xlim(0, 0.3) + geom_line(color = "red") + labs(x="Children in a Single Parent Household", y="Drug Overdose Deaths") 
+
+
+grid.arrange(plot_unemployment, plot_adult_smoking, pdp_children,  ncol = 3)
+
+
+final_drug_rf <-ranger(drug_overdose_deaths ~ ., data = train, num.trees=500, mtry=3, min.node.size=5, importance="impurity") 
+
+# add figure number
+
+```
+
+The top predictors of drug overdose rates--unemployment, smoking rate, and Children in Single Parent households are all positively associated with drug overdose
+
+
+# Discussion
+
+From the models, it was found that unemployment is a top predictor for both drug overdose deaths and alcohol-impaired driving deaths. So if unemployment increases, alcohol and drug consumption would most likely increase as well. 
+  
+A risk factor for substance abuse and drug use disorders is unemployment. According to the American Addiction Center, losing one's job and money can cause psychological stress. This can then deteriorate one's health and cause temporary coping mechanisms like substance abuse. Specifically, this indicates that losing one's job is linked to an increased risk of alcohol-related health issues and the use of illegal drugs. 
+
+Further research from the American Addiction Center indicates that substance abuse problems are associated with an increased chance of unemployment because those who struggle with their use are more likely to take sick days and work less productively, both of which can lead to job loss. Furthermore, addiction also increases the difficulty of getting hired again or finding a new job.
+
+## Ways to Reduce Unemployment
+
+**Career pathways programs:** Programs for career pathways provide low-skilled people with occupation-specific training for higher-skilled roles in rapidly expanding industries including information technology, advanced manufacturing, and health care. These programs integrate social services with academic and technical education; many also include work experience ("Building Strong Middle-Class Career Pathways Programs").
+
+**Summer youth employment programs:** Summer youth employment programs give young people, often between the ages of 14 and 24, temporary jobs. Program organizers typically provide financial support for positions, and programs are managed by nonprofits or government organizations. Private sector businesses, on the other hand, could offer more competitive placements and pay participants directly. Programs may incorporate extra supports, such a work-readiness curriculum, and typically center on giving underprivileged youngsters options (“Youth Employment Programs”).
+
+**Providing a generous tax credit for companies:** This will incentivize job creation by reducing the financial burden of hiring additional workers. This encourages businesses to expand their workforce, thereby reducing overall unemployment rates (Lerman).
+
+## Limitations
+
+Since we are working with county level data, all individuals’ data in a county are simply averaged which might mask important granular differences within counties. This could be an issue especially for larger counties that have multiple urban and rural areas and are therefore more socioeconomically and demographically diverse. For example, Los Angeles County is huge (population-wise) with 88 cities and nearly as many unincorporated areas. All these areas have vastly different socioeconomic conditions, access to healthcare, education levels, and employment opportunities. Aggregating by county masks these differences and makes it hard to generalize our findings. Additionally, drug overdose rates could vary by state depending on how strict the regulations are on drugs accessibility.
+
+As the dataset had a lot of missing data on drug overdose deaths, we had to reduce our dataset from 3000 to 1000 observations. This increases variability in the data, leading to less precise parameter estimates.
+
+
+# Conclusion and Next Steps
+
+**The hypothesis is half correct. There are social predictors for alcohol-impaired driving deaths and drug overdoses, but there isn’t enough evidence from the results to justify demographic predictors**
+
+To account for variability of drug overdoses, we can consider mixed effect models and try adding random intercept terms for state and urbanization level to effectively cluster the data by state or by urbanization level (rural, suburban, urban). This allows us to examine how geographic regions could impact the variability of baseline drug overdoses, highlighting more targeted and context-specific prevention and intervention programs.
+
+In the future, identifying comparable datasets to impute data from and using methods such as k-nearest neighbors (KNN) or aggregating by state to fill in the missing data will be prioritized. This approach will enhance data completeness and reduce bias in our analyses.
+
+# References
+
+“Alcohol and Drug Abuse Statistics (Facts About Addiction).” American Addiction Centers, https://americanaddictioncenters.org/addiction-statistics. Accessed July 2024.
+
+“Building Strong Middle-Class Career Pathways Programs.” Center for American Progress, https://www.americanprogress.org/article/building-strong-middle-class-career-pathways-programs/. Accessed 21 July 2024.
+
+Generes, Wendy Manwarren. “Recession, Unemployment, and Drug Addiction: What's the Link?” American Addiction Centers, 21 June 2024, https://americanaddictioncenters.org/blog/recession-unemployment-and-drug-addiction-whats-the-link. Accessed July 2024.
+
+“Health Data.” County Health Rankings, https://www.countyhealthrankings.org/health-data. Accessed July 2024.
+
+Lerman, Robert I. “Five Steps to Cut Unemployment.” Urban Institute, 4 Oct. 2011, https://www.urban.org/urban-wire/five-steps-cut-unemployment. Accessed 21 July 2024.
+
+“The West Virginia Drug Situation.” DEA.gov, https://www.dea.gov/sites/default/files/2018-07/DEA-WAS-DIR-024-17%20West%20Virginia%20Drug%20Situation%20-UNCLASSIFIED.pdf. Accessed July 2024.
+
+“Worst States For Drunk Driving In 2024 – Forbes Advisor.” Forbes, 3 May 2024, https://www.forbes.com/advisor/car-insurance/worst-states-for-drunk-driving/. Accessed July 2024.
+
+“Youth Employment Programs.” Youth.gov, https://youth.gov/feature-article/supporting-summer-youth-employment-programs. Accessed 21 July 2024.
+
+“2023 County Profiles Executive Summary Report.” West Virginia Department of Health and Human Resources. https://dhhr.wv.gov/vip/county-reports/Pages/2023-CSMP-Surveillance-Reports.aspx. Accessed July 2024.
