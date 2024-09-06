@@ -21,9 +21,9 @@ execute:
 
 In 2022, 46.8 million Americans who were twelve years of age or older struggled with a drug use disorder.  Eight million Americans aged twelve and older battled alcohol and drug use issues at the same time that year.  Use of drugs and alcohol has substantial financial consequences. Every year, excessive alcohol use costs 249 billion dollars in lost productivity, medical expenditures, and criminal justice costs. In contrast, illicit drug usage costs 193 billion dollars in lost productivity, criminality, and medical costs. Communities can benefit from adopting and putting into practice policies that lessen prescription drug abuse and excessive alcohol consumption.
 
-From this information, the question we are going to answer, is there demographic and social factors that are predictors of drug overdose and alcohol-related incidents (e.g., driving accidents)?
+**Research Question: ** Is there demographic and social factors that are predictors of drug overdose and alcohol-related incidents (e.g., driving accidents)?
 
-Our hypothesis we came to is, the chances of drug overdoses and alcohol-related driving incidents can be predicted by demographic factors like age, gender, and race as well as social factors like substance use habits and socioeconomic status. 
+**Hypothesis: ** The chances of drug overdoses and alcohol-related driving incidents can be predicted by demographic factors like age, gender, and race as well as social factors like substance use habits, education, socioeconomic status. 
 
 Certain demographic variables—like age, gender, and race—have a major impact on the risk of drug overdoses and incidents involving alcohol and driving. For example, middle-aged people may be at risk from long-term substance use, while younger people may be at risk from peer pressure and experimentation.
 Another important factor is gender: it's possible that men experience higher rates of substance abuse and related incidents than women do, possibly as a result of differing social behaviors and stress reactions. Differences in socioeconomic status, community support, and access to healthcare can all contribute to racial disparities.
@@ -33,9 +33,9 @@ Tailored interventions can be devised through the identification and comprehensi
 
 # Data
 
-The data is collected by the University of Wisconsin Population Health Institute. It assigns a ranking based on health outcomes and health factors to each county in every state. There were originally 770 variables in the data set. Since the data set is so big, another data set was created with only the variables related to drug overdose deaths and alcohol-impaired driving deaths. Predictor variables are drug overdose deaths and alcohol-impaired driving deaths.
+The data is collected by the University of Wisconsin Population Health Institute and includes health, clinical, social/economic, and demographic variables measured at the county level. The two response variables we are modeling are drug overdose rates and alcohol-impaired driving deaths. Drug overdose rates measure number of drug poisoning deaths per 100,000 from 2019-2021. Alcohol-impaired driving deaths measures percentage of driving deaths with alcohol involvement from 2017-2021. 
 
-Here are some of the predictor variables picked and the reason for selecting them:
+We considered the following social-economic and demographic variables:
 
 **Unemployment:** Compared to the employed population, the unemployed population has worse health and higher death rates. 
 
@@ -233,9 +233,9 @@ ggplot(filtered_data, aes(x = adult_smoking_raw_value, y = drug_overdose_deaths_
 
 
 
-# Modeling (go back on this)
+# Methods 
 
-We decided on a linear regression model and variations of linear regression--Ridge, Lasso, and Elastic Net to assist with feature selection. Ridge and Lasso regression are methods that reduce multicollinearity by imposing regularization penalties. Ridge is more conservative as it reduces the magnitude of coefficients by shrinking coefficients to near zero, while retaining all variables. Lasso on the other hand penalizes the model more by shrinking coefficients to exactly zero which removes unimportant variables from the model, making it extremely effective in reducing overfitting. Lasso Elastic Net is a balanced approach to variable selection and regularization that incorporates the strengths of both Ridge and Lasso. Finally, Random Forest, an ensemble method, is a potent instrument for managing intricate datasets due to its ability to capture non-linear relationships and interactions between variables, which provides both flexibility and robustness. We are able to identify the most effective predictive techniques and obtain a deeper understanding of the underlying patterns by conducting a comprehensive evaluation of our data using these diverse models.
+To model alcohol-impaired deaths rate, we decided on a linear regression model and variations of linear regression--Ridge, Lasso, and Elastic Net to assist with feature selection. Ridge and Lasso regression are methods that reduce multicollinearity by imposing regularization penalties. Ridge is more conservative as it reduces the magnitude of coefficients by shrinking coefficients to near zero, while retaining all variables. Lasso on the other hand penalizes the model more by shrinking coefficients to exactly zero which removes unimportant variables from the model, making it extremely effective in reducing overfitting. Lasso Elastic Net is a balanced approach to variable selection and regularization that incorporates the strengths of both Ridge and Lasso. Finally, Random Forest, an ensemble method, is a potent instrument for managing intricate datasets due to its ability to capture non-linear relationships and interactions between variables, which provides both flexibility and robustness. 
 
 
 **K-Fold Cross-Validation** 
